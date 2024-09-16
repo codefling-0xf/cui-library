@@ -334,7 +334,7 @@ namespace Oxide.Plugins
                             SerializeField("interval", component.Interval, 1f);
                             SerializeField("timerFormat", TimerFormatToString[component.TimerFormat], TimerFormatToString[TimerFormat.None]);
                             SerializeField("numberFormat", component.NumberFormat, "0.####");
-                            SerializeField("destroyIfDone", component.DestroyIfDone, false);
+                            SerializeField("destroyIfDone", component.DestroyIfDone, true);
                             SerializeField("command", component.Command, null);
                             SerializeField("fadeIn", component.FadeIn, 0f);
                             jsonWriter.WriteEndObject();
