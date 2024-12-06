@@ -91,6 +91,22 @@ namespace Oxide.Plugins
                 { ScrollRect.MovementType.Clamped, ScrollRect.MovementType.Clamped.ToString() },
             };
 
+
+            private static readonly Dictionary<TimerFormat, string> TimerFormatToString = new Dictionary<TimerFormat, string>
+            {
+                { TimerFormat.None, TimerFormat.None.ToString() },
+                { TimerFormat.SecondsHundreth, TimerFormat.SecondsHundreth.ToString() },
+                { TimerFormat.MinutesSeconds, TimerFormat.MinutesSeconds.ToString() },
+                { TimerFormat.MinutesSecondsHundreth, TimerFormat.MinutesSecondsHundreth.ToString() },
+                { TimerFormat.HoursMinutes, TimerFormat.HoursMinutes.ToString() },
+                { TimerFormat.HoursMinutesSeconds, TimerFormat.HoursMinutesSeconds.ToString() },
+                { TimerFormat.HoursMinutesSecondsMilliseconds, TimerFormat.HoursMinutesSecondsMilliseconds.ToString() },
+                { TimerFormat.HoursMinutesSecondsTenths, TimerFormat.HoursMinutesSecondsTenths.ToString() },
+                { TimerFormat.DaysHoursMinutes, TimerFormat.DaysHoursMinutes.ToString() },
+                { TimerFormat.DaysHoursMinutesSeconds, TimerFormat.DaysHoursMinutesSeconds.ToString() },
+                { TimerFormat.Custom, TimerFormat.Custom.ToString() },
+            };
+
             public static class Defaults
             {
                 public const string VectorZero = "0 0";
@@ -319,9 +335,13 @@ namespace Oxide.Plugins
                             CuiCountdownComponent component = IComponent as CuiCountdownComponent;
                             jsonWriter.WriteStartObject();
                             SerializeType();
-                            SerializeField("endTime", component.EndTime, 0);
-                            SerializeField("startTime", component.StartTime, 0);
-                            SerializeField("step", component.Step, 1);
+                            SerializeField("endTime", component.EndTime, 0f);
+                            SerializeField("startTime", component.StartTime, 0f);
+                            SerializeField("step", component.Step, 1f);
+                            SerializeField("interval", component.Interval, 1f);
+                            SerializeField("timerFormat", TimerFormatToString[component.TimerFormat], TimerFormatToString[TimerFormat.None]);
+                            SerializeField("numberFormat", component.NumberFormat, "0.####");
+                            SerializeField("destroyIfDone", component.DestroyIfDone, true);
                             SerializeField("command", component.Command, null);
                             SerializeField("fadeIn", component.FadeIn, 0f);
                             jsonWriter.WriteEndObject();
@@ -611,24 +631,16 @@ namespace Oxide.Plugins
                     this.FadeOut = @out;
                     foreach (ICuiComponent component in this.Components)
                     {
-                        CuiImageComponent imageComponent = component as CuiImageComponent;
-                        if (imageComponent != null)
-                        {
-                            imageComponent.FadeIn = @in;
-                            continue;
-                        }
-                        CuiButtonComponent buttonComponent = component as CuiButtonComponent;
-                        if (buttonComponent != null)
-                        {
-                            buttonComponent.FadeIn = @in;
-                            continue;
-                        }
-                        CuiTextComponent textComponent = component as CuiTextComponent;
-                        if (textComponent != null)
-                        {
-                            textComponent.FadeIn = @in;
-                            continue;
-                        }
+                        if (component is CuiRawImageComponent rawImage)
+                            rawImage.FadeIn = @in;
+                        else if (component is CuiImageComponent image)
+                            image.FadeIn = @in;
+                        else if (component is CuiButtonComponent button)
+                            button.FadeIn = @in;
+                        else if (component is CuiTextComponent text)
+                            text.FadeIn = @in;
+                        else if (component is CuiCountdownComponent countdown)
+                            countdown.FadeIn = @in;
                     }
                     return this;
                 }
@@ -659,10 +671,33 @@ namespace Oxide.Plugins
 
                 public class ComponentList : List<ICuiComponent>
                 {
+                    private Dictionary<Type, ICuiComponent> typeToComponent = new Dictionary<Type, ICuiComponent>();
+
                     public T Get<T>() where T : ICuiComponent
                     {
-                        return (T)this.Find(c => c.GetType() == typeof(T));
+                        if (typeToComponent.TryGetValue(typeof(T), out ICuiComponent component))
+                            return (T)component;
+                        return default(T);
                     }
+
+                    public new void Add(ICuiComponent item)
+                    {
+                        base.Add(item);
+                        typeToComponent.Add(item.GetType(), item);
+                    }
+
+                    public new void Remove(ICuiComponent item)
+                    {
+                        base.Remove(item);
+                        typeToComponent.Remove(item.GetType());
+                    }
+
+                    public new void Clear()
+                    {
+                        base.Clear();
+                        typeToComponent.Clear();
+                    }
+
 
                     public ComponentList AddImage(
                         string color = Defaults.Color,
@@ -699,9 +734,7 @@ namespace Oxide.Plugins
                         if (!string.IsNullOrEmpty(content))
                         {
                             if (content.Contains("://"))
-                            {
                                 rawImageComponent.Url = content;
-                            }
                             else if (content.IsNumeric())
                             {
                                 if (content.IsSteamId())
@@ -848,14 +881,26 @@ namespace Oxide.Plugins
                         return this;
                     }
 
-                    public ComponentList AddCountdown(string command = null, int endTime = 0, int startTime = 0, int step = 1)
+                    public ComponentList AddCountdown(
+                        string command = null,
+                        float endTime = 0,
+                        float startTime = 0,
+                        float step = 1,
+                        float interval = 1f,
+                        TimerFormat timerFormat = TimerFormat.None,
+                        string numberFormat = "0.####",
+                        bool destroyIfDone = true)
                     {
                         Add(new CuiCountdownComponent
                         {
                             Command = command,
                             EndTime = endTime,
                             StartTime = startTime,
-                            Step = step
+                            Step = step,
+                            Interval = interval,
+                            TimerFormat = timerFormat,
+                            NumberFormat = numberFormat,
+                            DestroyIfDone = destroyIfDone
                         });
                         return this;
                     }
@@ -981,7 +1026,6 @@ namespace Oxide.Plugins
                     element.Components.AddRawImage(content, color, material: material);
                     return element;
                 }
-
 
                 public static CUI.Element CreateIcon(
                         int itemId,
