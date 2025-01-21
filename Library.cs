@@ -215,7 +215,7 @@ namespace Oxide.Plugins
                             SerializeField("anchormin", component.AnchorMin, vector2zero);
                             SerializeField("anchormax", component.AnchorMax, vector2one);
                             SerializeField("offsetmin", component.OffsetMin, vector2zero);
-                            SerializeField("offsetmax", component.OffsetMax, vector2zero);
+                            SerializeField("offsetmax", component.OffsetMax, vector2one);
                             jsonWriter.WriteEndObject();
                             break;
                         }
